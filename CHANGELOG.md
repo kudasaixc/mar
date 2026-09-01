@@ -10,3 +10,4 @@ All notable changes are documented here. MAR follows Semantic Versioning.
 - Workspace file/search/command/diff tools with approval modes and safety boundaries.
 - Provider and tool plugin API.
 - Bash, npm, pnpm, Yarn, and Bun distribution paths.
+- Built-in JavaScript search fallback for systems without ripgrep.

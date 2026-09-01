@@ -33,7 +33,7 @@ test("workspace blocks lexical and symlink escapes", async () => {
   const outside = await mkdtemp(join(tmpdir(), "mar-outside-"));
   temporary.push(outside);
   await writeFile(join(outside, "secret"), "nope");
-  await symlink(outside, join(root, "escape"));
+  await symlink(outside, join(root, "escape"), process.platform === "win32" ? "junction" : "dir");
   await assert.rejects(() => workspace.read("../secret"), /escapes the workspace/);
   await assert.rejects(() => workspace.read("escape/secret"), /Symlink escapes/);
 });
@@ -41,4 +41,17 @@ test("workspace blocks lexical and symlink escapes", async () => {
 test("workspace baseline policy blocks destructive recursive force", async () => {
   const { workspace } = await fixture();
   await assert.rejects(() => workspace.run("rm -rf ./src"), /blocked/);
+});
+
+test("workspace search falls back when ripgrep is unavailable", async () => {
+  const { workspace } = await fixture();
+  await workspace.write("src/fallback.ts", "const portableSearch = true;\n");
+  const originalPath = process.env.PATH;
+  process.env.PATH = "";
+  try {
+    assert.match(await workspace.search("portableSearch", ".", "*.ts"), /src\/fallback\.ts:1/);
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+  }
 });

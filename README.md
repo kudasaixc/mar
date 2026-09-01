@@ -29,7 +29,7 @@ flowchart LR
 
 ## Install
 
-The user-local installer needs Node.js 20+, npm, Git, curl, and tar. It never invokes `sudo`:
+The user-local installer needs Node.js 20+, npm, curl, and tar. It never invokes `sudo`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kudasaixc/mar/main/install.sh | bash

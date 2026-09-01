@@ -1,6 +1,6 @@
 import { exec as execCallback, execFile as execFileCallback } from "node:child_process";
 import { lstat, mkdir, readFile, readdir, realpath, rename, stat, writeFile } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 import { ToolError } from "../errors.js";
@@ -96,8 +96,48 @@ export class Workspace {
       return this.trimOutput(stdout.replaceAll(`${this.root}${sep}`, ""));
     } catch (error: any) {
       if (error?.code === 1) return "No matches.";
+      if (error?.code === "ENOENT") return this.searchWithoutRipgrep(pattern, safe, glob);
       throw new ToolError(`Search failed: ${error?.message ?? String(error)}`);
     }
+  }
+
+  private async searchWithoutRipgrep(pattern: string, target: string, glob?: string): Promise<string> {
+    let expression: RegExp;
+    try {
+      expression = new RegExp(pattern, "g");
+    } catch (error) {
+      throw new ToolError(`Invalid search expression: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    const files: string[] = [];
+    const collect = async (path: string): Promise<void> => {
+      const info = await stat(path);
+      if (info.isFile()) {
+        if (info.size <= 2_000_000 && (!glob || matchesGlob(this.displayPath(path), glob))) files.push(path);
+        return;
+      }
+      for (const entry of await readdir(path, { withFileTypes: true })) {
+        if (IGNORED.has(entry.name) || entry.isSymbolicLink()) continue;
+        const child = join(path, entry.name);
+        if (entry.isDirectory()) await collect(child);
+        else if (entry.isFile()) {
+          const info = await stat(child);
+          if (info.size <= 2_000_000 && (!glob || matchesGlob(this.displayPath(child), glob))) files.push(child);
+        }
+        if (files.length >= 5000) return;
+      }
+    };
+    await collect(target);
+    const matches: string[] = [];
+    for (const file of files) {
+      let content: string;
+      try { content = await readFile(file, "utf8"); } catch { continue; }
+      for (const [index, line] of content.split("\n").entries()) {
+        expression.lastIndex = 0;
+        if (expression.test(line)) matches.push(`${this.displayPath(file)}:${index + 1}:${line}`);
+        if (matches.length >= 2000) return `${matches.join("\n")}\n[results truncated]`;
+      }
+    }
+    return matches.join("\n") || "No matches.";
   }
 
   async write(path: string, content: string): Promise<string> {
@@ -173,4 +213,15 @@ export class Workspace {
     if (keepTail) return `[output truncated]\n${output.slice(-this.maxOutput)}`;
     return `${output.slice(0, this.maxOutput)}\n[output truncated]`;
   }
+}
+
+function matchesGlob(path: string, glob: string): boolean {
+  const escaped = glob
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replaceAll("**", "\u0000")
+    .replaceAll("*", "[^/]*")
+    .replaceAll("?", "[^/]")
+    .replaceAll("\u0000", ".*");
+  const expression = new RegExp(`^${escaped}$`);
+  return expression.test(path.replaceAll(sep, "/")) || expression.test(basename(path));
 }
