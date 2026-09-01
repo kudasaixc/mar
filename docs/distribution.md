@@ -11,7 +11,7 @@ curl -fsSL https://raw.githubusercontent.com/kudasaixc/mar/main/install.sh | bas
 Controls:
 
 ```bash
-MAR_VERSION=0.1.0 bash install.sh
+MAR_VERSION=1.2.3 bash install.sh
 MAR_INSTALL_DIR="$HOME/apps/mar" MAR_BIN_DIR="$HOME/bin" bash install.sh
 bash install.sh --uninstall
 ```

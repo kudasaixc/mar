@@ -43,10 +43,10 @@ npm install --global https://github.com/kudasaixc/mar/archive/refs/heads/main.ta
 # bun add --global https://github.com/kudasaixc/mar/archive/refs/heads/main.tar.gz
 ```
 
-Tagged releases can be pinned with the installer:
+After a tagged release exists, it can be pinned with the installer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kudasaixc/mar/main/install.sh | MAR_VERSION=0.1.0 bash
+curl -fsSL https://raw.githubusercontent.com/kudasaixc/mar/main/install.sh | MAR_VERSION=1.2.3 bash
 ```
 
 When the package is published to npm, `npm install -g @kudasaixc/mar` and the equivalent pnpm, Yarn, and Bun commands use the same artifact. See [distribution options](docs/distribution.md).
