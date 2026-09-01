@@ -30,8 +30,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test dist/test/*.test.js",
-    "test:coverage": "npm run build && node --test --experimental-test-coverage dist/test/*.test.js",
+    "test": "npm run build && node scripts/run-tests.mjs",
+    "test:coverage": "npm run build && node scripts/run-tests.mjs --coverage",
     "lint": "npm run check",
     "prepare": "npm run build",
     "prepack": "npm run build"
