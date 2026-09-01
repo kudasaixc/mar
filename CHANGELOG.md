@@ -11,3 +11,4 @@ All notable changes are documented here. MAR follows Semantic Versioning.
 - Provider and tool plugin API.
 - Bash, npm, pnpm, Yarn, and Bun distribution paths.
 - Built-in JavaScript search fallback for systems without ripgrep.
+- Precompiled production artifacts for toolchain-free GitHub package installs.

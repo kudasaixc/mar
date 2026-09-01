@@ -23,10 +23,10 @@ Uninstall permanently removes the selected MAR install root and its executable s
 Install directly from GitHub today:
 
 ```bash
-npm install -g github:kudasaixc/mar
-pnpm add -g github:kudasaixc/mar
-yarn global add github:kudasaixc/mar
-bun add -g github:kudasaixc/mar
+npm install -g https://github.com/kudasaixc/mar/archive/refs/heads/main.tar.gz
+pnpm add -g https://github.com/kudasaixc/mar/archive/refs/heads/main.tar.gz
+yarn global add https://github.com/kudasaixc/mar/archive/refs/heads/main.tar.gz
+bun add -g https://github.com/kudasaixc/mar/archive/refs/heads/main.tar.gz
 ```
 
 After npm publication:

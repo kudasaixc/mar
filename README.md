@@ -38,9 +38,9 @@ curl -fsSL https://raw.githubusercontent.com/kudasaixc/mar/main/install.sh | bas
 Or install directly with a JavaScript package manager:
 
 ```bash
-npm install --global github:kudasaixc/mar
-# pnpm add --global github:kudasaixc/mar
-# bun add --global github:kudasaixc/mar
+npm install --global https://github.com/kudasaixc/mar/archive/refs/heads/main.tar.gz
+# pnpm add --global https://github.com/kudasaixc/mar/archive/refs/heads/main.tar.gz
+# bun add --global https://github.com/kudasaixc/mar/archive/refs/heads/main.tar.gz
 ```
 
 Tagged releases can be pinned with the installer:
