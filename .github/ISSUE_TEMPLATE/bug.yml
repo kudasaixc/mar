@@ -1,0 +1,41 @@
+name: Bug report
+description: Report reproducible incorrect behavior
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Never include API keys, credentials, or private source code.
+  - type: input
+    id: version
+    attributes:
+      label: MAR version
+      placeholder: Output of mar --version
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: OS, Node version, provider kind
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Minimal steps and sanitized configuration
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true

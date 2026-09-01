@@ -1,0 +1,67 @@
+{
+  "name": "@kudasaixc/mar",
+  "version": "0.1.0",
+  "description": "Model-agnostic multi-agent coding runtime for your terminal",
+  "type": "module",
+  "bin": {
+    "mar": "dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin-api.d.ts",
+      "import": "./dist/plugin-api.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/test",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "test:coverage": "npm run build && node --test --experimental-test-coverage dist/test/*.test.js",
+    "lint": "npm run check",
+    "prepare": "npm run build",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "coding-agent",
+    "cli",
+    "llm",
+    "multi-agent",
+    "ollama",
+    "opencode"
+  ],
+  "author": "kudasai <47227786+kudasaixc@users.noreply.github.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kudasaixc/mar.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kudasaixc/mar/issues"
+  },
+  "homepage": "https://github.com/kudasaixc/mar#readme",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.3"
+  }
+}
