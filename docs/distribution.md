@@ -41,7 +41,7 @@ bun add -g @kudasaixc/mar
 ## Maintainer release
 
 1. Update `package.json` and `CHANGELOG.md`.
-2. Run `npm ci && npm test && npm pack --dry-run`.
+2. Run `npm ci && npm test && git diff --exit-code -- dist && npm pack --dry-run`.
 3. Tag the commit as `vX.Y.Z` and push the tag.
 4. The release workflow tests the exact source, creates an npm tarball, and attaches it to a GitHub Release.
 5. If the repository secret `NPM_TOKEN` exists, the workflow also publishes the public package with npm provenance.

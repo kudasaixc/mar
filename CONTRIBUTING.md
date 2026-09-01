@@ -5,6 +5,7 @@ Use Node.js 20 or newer. Fork the repository, create a focused branch, and run:
 ```bash
 npm ci
 npm test
+git diff --exit-code -- dist
 npm pack --dry-run
 ```
 

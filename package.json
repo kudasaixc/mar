@@ -33,8 +33,7 @@
     "test": "npm run build && node scripts/run-tests.mjs",
     "test:coverage": "npm run build && node scripts/run-tests.mjs --coverage",
     "lint": "npm run check",
-    "prepare": "npm run build",
-    "prepack": "npm run build"
+    "prepublishOnly": "npm test"
   },
   "keywords": [
     "ai",

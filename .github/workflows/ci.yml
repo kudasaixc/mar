@@ -39,4 +39,6 @@ jobs:
           cache: npm
       - run: bash -n install.sh
       - run: npm ci
+      - run: npm run build
+      - run: git diff --exit-code -- dist
       - run: node dist/cli.js --help
