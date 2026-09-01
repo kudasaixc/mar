@@ -49,7 +49,7 @@ export class Workspace {
 
   displayPath(path: string): string {
     const rel = relative(this.root, path);
-    return rel || ".";
+    return rel ? rel.replaceAll(sep, "/") : ".";
   }
 
   async read(path: string, startLine = 1, endLine = 500): Promise<string> {
@@ -84,7 +84,7 @@ export class Workspace {
 
   async search(pattern: string, path = ".", glob?: string): Promise<string> {
     const safe = await this.resolveSafe(path);
-    const args = ["--line-number", "--no-heading", "--color", "never"];
+    const args = ["--line-number", "--no-heading", "--color", "never", "--path-separator", "/"];
     if (glob) args.push("--glob", glob);
     args.push("--", pattern, safe);
     try {
