@@ -5,7 +5,7 @@ import { ConfigurationError } from "../errors.js";
 
 test("default configuration is valid", () => {
   const config = validateConfig(defaultConfig());
-  assert.equal(config.version, 1);
+  assert.equal(config.version, 2);
   assert.equal(config.team.master.provider, "ollama");
 });
 

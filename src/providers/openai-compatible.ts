@@ -1,11 +1,13 @@
-import type { ChatMessage, CompletionRequest, CompletionResponse, ModelAdapter, ProviderConfig } from "../types.js";
-import { contentToString, fetchJson, joinUrl, parseArguments, requireApiKey } from "./http.js";
+import { ProviderError } from "../errors.js";
+import type { ChatMessage, CompletionRequest, CompletionResponse, ModelAdapter, ProviderConfig, ToolCall, Usage } from "../types.js";
+import { contentToString, fetchJson, joinUrl, parseArguments, parseJson, requireApiKey, sse, streamRequest, uniqueCallIds } from "./http.js";
 
 function mapMessage(message: ChatMessage): Record<string, unknown> {
   if (message.role === "tool") {
-    return { role: "tool", content: message.content, tool_call_id: message.toolCallId };
+    return { role: "tool", content: message.isError ? `[tool error]\n${message.content}` : message.content, tool_call_id: message.toolCallId };
   }
   const mapped: Record<string, unknown> = { role: message.role, content: message.content || null };
+  if (message.role !== "assistant" && !message.content) mapped.content = "";
   if (message.toolCalls?.length) {
     mapped.tool_calls = message.toolCalls.map((call) => ({
       id: call.id,
@@ -14,6 +16,16 @@ function mapMessage(message: ChatMessage): Record<string, unknown> {
     }));
   }
   return mapped;
+}
+
+function usageFrom(raw: any): Usage | undefined {
+  if (!raw) return undefined;
+  return {
+    ...(typeof raw.prompt_tokens === "number" ? { inputTokens: raw.prompt_tokens } : {}),
+    ...(typeof raw.completion_tokens === "number" ? { outputTokens: raw.completion_tokens } : {}),
+    ...(typeof raw.prompt_tokens_details?.cached_tokens === "number" ? { cachedInputTokens: raw.prompt_tokens_details.cached_tokens } : {}),
+    ...(typeof raw.completion_tokens_details?.reasoning_tokens === "number" ? { reasoningTokens: raw.completion_tokens_details.reasoning_tokens } : {}),
+  };
 }
 
 export class OpenAICompatibleAdapter implements ModelAdapter {
@@ -27,6 +39,10 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     this.baseUrl = config.baseUrl ?? "https://api.openai.com/v1";
   }
 
+  private get official(): boolean {
+    return /api\.openai\.com/.test(this.baseUrl);
+  }
+
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
     const apiKey = requireApiKey(this.id, this.config.apiKeyEnv);
     const headers: Record<string, string> = {
@@ -34,12 +50,15 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
       ...this.config.headers,
     };
+    const stream = Boolean(request.onDelta) && this.config.stream !== false;
     const body: Record<string, unknown> = {
       model: request.model,
       messages: request.messages.map(mapMessage),
-      stream: false,
+      stream,
+      ...(stream && (this.official || /openrouter\.ai/.test(this.baseUrl)) ? { stream_options: { include_usage: true } } : {}),
       ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
-      ...(request.maxTokens !== undefined ? { max_tokens: request.maxTokens } : {}),
+      // OpenAI deprecated max_tokens for newer models; compatible servers still expect it.
+      ...(request.maxTokens !== undefined ? { [this.official ? "max_completion_tokens" : "max_tokens"]: request.maxTokens } : {}),
       ...(request.tools.length ? {
         tools: request.tools.map((tool) => ({ type: "function", function: tool })),
         tool_choice: "auto",
@@ -47,26 +66,79 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       ...this.config.options,
       ...request.options,
     };
-    const data = await fetchJson(joinUrl(this.baseUrl, "chat/completions"), {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
+    const url = joinUrl(this.baseUrl, "chat/completions");
+    const init = { method: "POST", headers, body: JSON.stringify(body) };
+    const options = { timeoutMs: this.config.timeoutMs ?? 180_000, ...(request.signal ? { signal: request.signal } : {}) };
+    if (stream) return streamRequest(url, init, options, (response) => this.consume(response, request));
+
+    return this.fromJson(await fetchJson(url, init, options));
+  }
+
+  private fromJson(data: any): CompletionResponse {
+    if (data.error) throw new ProviderError(`Provider "${this.id}" error: ${JSON.stringify(data.error).slice(0, 300)}`, undefined, undefined, "server");
     const choice = data.choices?.[0];
-    if (!choice?.message) throw new Error(`Provider "${this.id}" returned no completion choice.`);
+    if (!choice?.message) throw new ProviderError(`Provider "${this.id}" returned no completion choice.`, undefined, undefined, "malformed");
+    const usage = usageFrom(data.usage);
     return {
       content: contentToString(choice.message.content),
-      toolCalls: (choice.message.tool_calls ?? []).map((call: any, index: number) => ({
-        id: call.id ?? `call_${Date.now()}_${index}`,
+      toolCalls: uniqueCallIds((choice.message.tool_calls ?? []).map((call: any) => ({
+        id: typeof call.id === "string" ? call.id : "",
         name: call.function?.name ?? "unknown",
         arguments: parseArguments(call.function?.arguments),
-      })),
+      }))),
       finishReason: choice.finish_reason,
-      usage: {
-        inputTokens: data.usage?.prompt_tokens,
-        outputTokens: data.usage?.completion_tokens,
-      },
+      ...(usage ? { usage } : {}),
     };
+  }
+
+  private async consume(response: Response, request: CompletionRequest): Promise<CompletionResponse> {
+    // Some compatible servers ignore `stream: true` and answer with a plain JSON body.
+    if (/application\/json/i.test(response.headers.get("content-type") ?? "")) {
+      const text = await response.text();
+      const result = this.fromJson(parseJson(text));
+      if (result.content) request.onDelta?.({ type: "text", text: result.content });
+      return result;
+    }
+    let content = "";
+    let finishReason: string | undefined;
+    let usage: Usage | undefined;
+    const calls = new Map<number, { id: string; name: string; args: string }>();
+    for await (const event of sse(response)) {
+      if (event.data === "[DONE]") break;
+      const chunk = parseJson(event.data);
+      if (chunk.error) {
+        const message = typeof chunk.error.message === "string" ? chunk.error.message : JSON.stringify(chunk.error);
+        throw new ProviderError(`Provider "${this.id}" stream error: ${message}`, undefined, undefined, "server");
+      }
+      if (chunk.usage) usage = usageFrom(chunk.usage);
+      const choice = chunk.choices?.[0];
+      if (!choice) continue;
+      if (choice.finish_reason) finishReason = choice.finish_reason;
+      const delta = choice.delta ?? {};
+      const reasoning = delta.reasoning_content ?? delta.reasoning;
+      if (typeof reasoning === "string" && reasoning) request.onDelta?.({ type: "reasoning", text: reasoning });
+      if (typeof delta.content === "string" && delta.content) {
+        content += delta.content;
+        request.onDelta?.({ type: "text", text: delta.content });
+      }
+      for (const part of delta.tool_calls ?? []) {
+        const index = typeof part.index === "number" ? part.index : calls.size;
+        let call = calls.get(index);
+        if (!call) {
+          call = { id: "", name: "", args: "" };
+          calls.set(index, call);
+        }
+        if (typeof part.id === "string" && part.id) call.id = part.id;
+        if (typeof part.function?.name === "string" && part.function.name) {
+          call.name += part.function.name;
+          request.onDelta?.({ type: "tool-call", id: call.id, name: call.name });
+        }
+        if (typeof part.function?.arguments === "string") call.args += part.function.arguments;
+      }
+    }
+    const toolCalls: ToolCall[] = [...calls.entries()].sort(([a], [b]) => a - b)
+      .map(([, call]) => ({ id: call.id, name: call.name || "unknown", arguments: parseArguments(call.args) }));
+    return { content, toolCalls: uniqueCallIds(toolCalls), ...(finishReason ? { finishReason } : {}), ...(usage ? { usage } : {}) };
   }
 
   async listModels(): Promise<string[]> {
