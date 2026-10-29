@@ -1,6 +1,6 @@
 import type { Interface } from "node:readline/promises";
 import { stdout } from "node:process";
-import { GLOBAL_CONFIG_PATH, saveConfig } from "../config.js";
+import { CONFIG_VERSION, defaultRuntime, GLOBAL_CONFIG_PATH, saveConfig } from "../config.js";
 import type { AgentProfile, MarConfig, ProviderConfig } from "../types.js";
 import { banner, colors } from "./terminal.js";
 
@@ -103,17 +103,15 @@ export async function runOnboarding(terminal: Interface): Promise<MarConfig> {
 
   stdout.write(`\n${colors.bold("3/3 — Safety")}\n`);
   const approvalChoice = await choose(terminal, "When may agents change files or run commands?", [
-    "Ask before every mutating tool call (recommended)",
-    "Autonomous — allow tool calls without prompts",
+    "Ask before every file change and command (recommended)",
+    "Allow file edits; ask before commands",
+    "Autonomous — allow tool calls without prompts (deny rules still apply)",
     "Read-only — never change the workspace",
   ]);
-  const approval = (["on-request", "never", "read-only"] as const)[approvalChoice]!;
-  const config: MarConfig = {
-    version: 1,
-    providers,
-    team: { master, workers },
-    runtime: { approval, commandTimeoutMs: 120_000, maxToolOutput: 30_000, plugins: [] },
-  };
+  const approval = (["on-request", "auto-edit", "never", "read-only"] as const)[approvalChoice]!;
+  const runtime = defaultRuntime();
+  runtime.approval = approval;
+  const config: MarConfig = { version: CONFIG_VERSION, providers, team: { master, workers }, runtime, pricing: {} };
   await saveConfig(config);
   stdout.write(`\n${colors.green("✓ Team configured")} at ${GLOBAL_CONFIG_PATH}\n`);
   for (const [id, provider] of Object.entries(providers)) {

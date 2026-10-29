@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, test } from "node:test";
 import { Orchestrator } from "../runtime/orchestrator.js";
-import type { MarConfig } from "../types.js";
+
 
 const temporary: string[] = [];
 
@@ -33,7 +33,7 @@ test("orchestrator completes an HTTP model-to-workspace tool loop", async () => 
   try {
     const address = server.address();
     assert(address && typeof address === "object");
-    const config: MarConfig = {
+    const config = {
       version: 1,
       providers: { mock: { kind: "openai-compatible", baseUrl: `http://127.0.0.1:${address.port}/v1` } },
       team: { master: { name: "master", description: "test", provider: "mock", model: "test" }, workers: [] },
@@ -72,7 +72,7 @@ export default {
   })
 };
 `, "utf8");
-  const config: MarConfig = {
+  const config = {
     version: 1,
     providers: { fake: { kind: "plugin", module: pluginPath } },
     team: {
