@@ -26,7 +26,20 @@ export default defineToolPlugin({
 });
 ```
 
-Add its package name or workspace-relative path to `runtime.plugins`. Set `mutating: true` for anything that can change files, processes, remote state, or user data so MAR applies its approval mode.
+Add its package name or workspace-relative path to `runtime.plugins`.
+
+Declare what a tool can do so the security policy can apply:
+
+- `permission: "read"`: never changes anything. Allowed in every mode, including `read-only`, and may run concurrently with other reads.
+- `permission: "write"`: changes workspace files. Asks in `on-request`, allowed in `auto-edit` and `never`.
+- `permission: "execute"`: runs processes or changes anything outside the workspace. Asks in `on-request` and `auto-edit`.
+- `mutating: true` without `permission` means `execute`, and `mutating: false` means `read` (0.1 compatibility).
+- `command(args)` (optional): returns the command string or argv the call will run, so allow and deny rules and approval prompts can see it.
+- `summarize(args)` (optional): a one-line description shown in approval prompts.
+
+`execute(args, context)` receives `context.signal`, an `AbortSignal` that fires on Ctrl+C or task timeout. Long-running tools must honor it. Return `{ ok, output, meta? }`, where `ok: false` means the call failed. Set `meta.modifiedFiles` (workspace-relative paths) when you change files, so verification can account for them. A mutating call without it is reported as "may have changed files".
+
+Plugins run in MAR's process with your privileges, outside any sandbox backend.
 
 ## Provider plugin
 

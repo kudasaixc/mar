@@ -11,10 +11,12 @@ MAR is not tied to one AI vendor. A Claude master can delegate frontend work to 
 - **Any model:** OpenAI-compatible APIs, Anthropic, Gemini, and Ollama are built in. OpenRouter, Groq, Mistral, DeepSeek, xAI, LM Studio, vLLM, and other compatible gateways only need a base URL.
 - **A real team:** choose a master and up to eight workers during onboarding. Every agent may use a different provider and model.
 - **Shared workspace:** agents inspect, search, edit, run checks, view diffs, and exchange notes in one selected directory.
-- **Parallel delegation:** independent worker calls emitted together by the master run concurrently; the master integrates and verifies their work.
+- **Parallel delegation:** independent worker calls emitted together by the master run concurrently, with dependencies, limits and timeouts. In a Git repository each worker gets its own worktree and its diff is applied only if it is conflict-free.
+- **Long sessions:** context is tracked and compacted automatically. Sessions persist and can be listed and resumed (`mar resume`), and survive crashes without replaying side effects.
+- **Honest results:** every run ends with a verification status (`unverified`, `tests_passing`, `checks_failed`, …) derived from what tools actually observed, never from the model's claims.
 - **Portable and private:** Node.js 20+, no runtime dependencies, no daemon, no `sudo`, and local models work through Ollama.
 - **Modular:** provider plugins, tool plugins, per-project configuration, agent prompts, model options, and ordered fallbacks are public interfaces.
-- **Controlled:** interactive approval is the default. Read-only and explicitly autonomous modes are available.
+- **Controlled:** interactive approval is the default, with `auto-edit`, read-only and autonomous modes, command allow/deny rules, secret redaction, an audit trail, and optional `bubblewrap` or `docker` sandboxes that fail closed.
 
 ```mermaid
 flowchart LR
@@ -91,9 +93,20 @@ mar "Fix all failing tests" --yes
 mar run "Audit this module" --dir ./packages/core
 ```
 
-Inside chat, use `/agents`, `/diff`, `/notes`, `/clear`, `/help`, and `/exit`.
+Resume work later:
 
-`--yes` permits agents to edit and execute commands without prompting. MAR still applies workspace path checks and a small destructive-command denylist, but this is **not an OS sandbox**. Use a container or VM for untrusted repositories or models.
+```bash
+mar sessions            # list sessions with status (completed, interrupted, …)
+mar resume              # resume the latest session for this directory
+mar resume 2f9c         # resume by id prefix
+mar sessions delete 2f9c
+```
+
+Inside chat, use `/agents`, `/tasks`, `/diff`, `/notes`, `/usage`, `/context`, `/compact`, `/verify`, `/clear`, `/help`, and `/exit`. Press Ctrl+C once to cancel the running task, twice to quit.
+
+`--verify` runs the configured or detected checks (tests, lint, type check) after the task. The exit code is 0 when the run completed, 2 when checks failed, 130 when cancelled, and 1 otherwise.
+
+`--yes` permits agents to edit and execute commands without prompting. Deny rules and workspace path checks still apply, but on the default `host` backend this is **not an OS sandbox**. Use `--sandbox bubblewrap` (Linux), `--sandbox docker`, or a VM for untrusted repositories or models. See [SECURITY.md](SECURITY.md) for exactly what each layer does and does not protect.
 
 ## Configure model mixtures
 
@@ -101,7 +114,7 @@ Global configuration lives at `~/.config/mar/config.json`. A repository may add 
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "providers": {
     "local": { "kind": "ollama", "baseUrl": "http://localhost:11434" },
     "router": {
@@ -131,12 +144,18 @@ Global configuration lives at `~/.config/mar/config.json`. A repository may add 
     "approval": "on-request",
     "commandTimeoutMs": 120000,
     "maxToolOutput": 30000,
-    "plugins": []
-  }
+    "plugins": [],
+    "sandbox": { "backend": "bubblewrap", "network": false },
+    "checks": { "test": "npm test" },
+    "budgets": { "maxCostUsd": 5 }
+  },
+  "pricing": { "router/*": { "input": 3, "output": 15 } }
 }
 ```
 
-Read the full [configuration reference](docs/configuration.md), [architecture](docs/architecture.md), [plugin API](docs/plugins.md), and [security model](SECURITY.md).
+Omitted fields take their defaults. Version 1 files still load; `mar config migrate` upgrades them in place and keeps a backup.
+
+Read the full [configuration reference](docs/configuration.md), [architecture](docs/architecture.md), [plugin API](docs/plugins.md), [security model](SECURITY.md), [development guide](docs/development.md), and [troubleshooting](docs/troubleshooting.md).
 
 ## Commands
 
@@ -144,11 +163,13 @@ Read the full [configuration reference](docs/configuration.md), [architecture](d
 |---|---|
 | `mar` / `mar chat` | Interactive coding session |
 | `mar init` | Configure a model team |
-| `mar run "…"` | Execute one task |
+| `mar run "…"` | Execute one task (`--verify`, `--approval`, `--sandbox`, `--verbose`) |
+| `mar sessions [show\|delete] [id]` | List, inspect, or delete saved sessions |
+| `mar resume [id]` | Resume a session (latest for this directory by default) |
 | `mar models` | Show master and workers |
 | `mar models --available` | Query provider model catalogs where supported |
-| `mar doctor` | Check Node, Git, workspace, config, and key variables |
-| `mar config show` | Print the merged configuration |
+| `mar doctor` | Check Node, Git, workspace, config, key variables (presence only), session store, and sandbox |
+| `mar config show\|path\|migrate` | Print the merged configuration, its file paths, or upgrade it to version 2 |
 | `mar completion bash\|zsh\|fish` | Generate shell completion |
 
 ## Development
@@ -158,6 +179,7 @@ git clone https://github.com/kudasaixc/mar.git
 cd mar
 npm ci
 npm test
+npm run bench
 node dist/cli.js --help
 ```
 
