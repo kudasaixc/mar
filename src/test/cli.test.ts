@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { cleanup, POSIX_ONLY, tempDir } from "./helpers.js";
 
 const CLI = join(fileURLToPath(new URL(".", import.meta.url)), "..", "cli.js");
+// Variables Windows needs for Node.js to start child processes and find temp/profile directories.
+const WINDOWS_ENV = ["SystemRoot", "SYSTEMROOT", "windir", "ComSpec", "PATHEXT", "TEMP", "TMP"];
 let home: string;
 let pluginPath: string;
 
@@ -35,7 +37,8 @@ function cli(args: string[], options: { cwd?: string; env?: Record<string, strin
     const child = spawn(process.execPath, [CLI, ...args], {
       cwd: options.cwd ?? home,
       env: {
-        PATH: process.env.PATH ?? "", HOME: home, MAR_CONFIG_DIR: join(home, "config"), MAR_STATE_DIR: join(home, "state", "sessions"),
+        ...Object.fromEntries(WINDOWS_ENV.flatMap((name) => process.env[name] ? [[name, process.env[name]!]] : [])),
+        PATH: process.env.PATH ?? "", HOME: home, USERPROFILE: home, MAR_CONFIG_DIR: join(home, "config"), MAR_STATE_DIR: join(home, "state", "sessions"),
         NO_COLOR: "1", ...options.env,
       },
       stdio: ["pipe", "pipe", "pipe"],

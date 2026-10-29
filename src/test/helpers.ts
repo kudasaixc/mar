@@ -71,6 +71,8 @@ export function git(cwd: string, ...args: string[]): string {
 export async function gitRepo(files: Record<string, string>): Promise<string> {
   const root = await tempDir("mar-git-");
   git(root, "init", "-q", "-b", "main");
+  // Keep fixtures byte-exact on Windows runners, where Git defaults to core.autocrlf=true.
+  git(root, "config", "core.autocrlf", "false");
   for (const [path, content] of Object.entries(files)) await writeFile(join(root, path), content);
   git(root, "add", "-A");
   git(root, "commit", "-q", "-m", "init");

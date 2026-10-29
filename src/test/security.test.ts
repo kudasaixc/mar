@@ -127,6 +127,12 @@ test("command environment excludes secrets unless explicitly passed through", ()
   assert.equal(env.NPM_TOKEN, undefined);
   assert.equal(env.GIT_TERMINAL_PROMPT, "0");
   assert.equal(commandEnvironment(["CUSTOM"], {}, source).CUSTOM, "c");
+  // Windows exposes mixed-case names such as "Path"; they must survive the allowlist there.
+  const windows = commandEnvironment([], {}, { Path: "C:\\bin", SystemRoot: "C:\\Windows", OPENAI_API_KEY: "sk-test" }, "win32");
+  assert.equal(windows.Path, "C:\\bin");
+  assert.equal(windows.SystemRoot, "C:\\Windows");
+  assert.equal(windows.OPENAI_API_KEY, undefined);
+  assert.equal(commandEnvironment([], {}, { Path: "/x" }, "linux").Path, undefined);
 });
 
 test("workspace refuses traversal, absolute paths, and symlink escapes", { skip: POSIX_ONLY }, async () => {

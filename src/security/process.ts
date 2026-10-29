@@ -150,12 +150,16 @@ const SAFE_ENV = new Set([
  * configured pass-through variables. Provider API keys are never forwarded unless
  * the user names them in `runtime.envPassthrough`.
  */
-export function commandEnvironment(passthrough: string[], extra: Record<string, string> = {}, source: NodeJS.ProcessEnv = process.env): Record<string, string> {
-  const allowed = new Set([...SAFE_ENV, ...passthrough]);
+export function commandEnvironment(
+  passthrough: string[], extra: Record<string, string> = {}, source: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform,
+): Record<string, string> {
+  // Windows variable names are case-insensitive (process.env exposes "Path", not "PATH").
+  const fold = platform === "win32" ? (name: string) => name.toUpperCase() : (name: string) => name;
+  const allowed = new Set([...SAFE_ENV, ...passthrough].map(fold));
   const env: Record<string, string> = {};
   for (const [name, value] of Object.entries(source)) {
     if (value === undefined) continue;
-    if (allowed.has(name) || name.startsWith("LC_")) env[name] = value;
+    if (allowed.has(fold(name)) || name.startsWith("LC_")) env[name] = value;
   }
   return { ...env, CI: env.CI ?? "1", NO_COLOR: "1", FORCE_COLOR: "0", GIT_TERMINAL_PROMPT: "0", ...extra };
 }

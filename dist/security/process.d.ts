@@ -33,6 +33,6 @@ export declare function runProcess(options: ProcessOptions): Promise<ProcessResu
  * configured pass-through variables. Provider API keys are never forwarded unless
  * the user names them in `runtime.envPassthrough`.
  */
-export declare function commandEnvironment(passthrough: string[], extra?: Record<string, string>, source?: NodeJS.ProcessEnv): Record<string, string>;
+export declare function commandEnvironment(passthrough: string[], extra?: Record<string, string>, source?: NodeJS.ProcessEnv, platform?: NodeJS.Platform): Record<string, string>;
 export declare function shellArgv(command: string): string[];
 //# sourceMappingURL=process.d.ts.map
