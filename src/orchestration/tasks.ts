@@ -135,7 +135,10 @@ export class TaskManager {
   }
 
   private async run(record: TaskRecord, parent: AbortSignal): Promise<void> {
-    const timeout = AbortSignal.timeout(this.options.timeoutMs);
+    // A referenced timer (unlike AbortSignal.timeout) keeps the process alive while a task waits on its deadline.
+    const deadline = new AbortController();
+    const timer = setTimeout(() => deadline.abort(new Error("timeout")), this.options.timeoutMs);
+    const timeout = deadline.signal;
     const linked = anySignal(parent, timeout);
     record.startedAt = new Date().toISOString();
     this.update(record, "running");
@@ -160,6 +163,7 @@ export class TaskManager {
         this.update(record, "failed", record.error);
       }
     } finally {
+      clearTimeout(timer);
       linked.dispose();
     }
   }
