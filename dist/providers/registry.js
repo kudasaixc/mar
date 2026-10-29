@@ -2,16 +2,19 @@ import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ConfigurationError } from "../errors.js";
 import { AnthropicAdapter } from "./anthropic.js";
+import { resolveCapabilities } from "./capabilities.js";
 import { GeminiAdapter } from "./gemini.js";
 import { OllamaAdapter } from "./ollama.js";
 import { OpenAICompatibleAdapter } from "./openai-compatible.js";
 export class ProviderRegistry {
     adapters = new Map();
+    configs = new Map();
     constructor() { }
     static async create(config) {
         const registry = new ProviderRegistry();
         for (const [id, provider] of Object.entries(config.providers)) {
             registry.adapters.set(id, await registry.createAdapter(id, provider));
+            registry.configs.set(id, provider);
         }
         return registry;
     }
@@ -41,6 +44,18 @@ export class ProviderRegistry {
         if (!adapter)
             throw new ConfigurationError(`Unknown provider "${id}".`);
         return adapter;
+    }
+    /** Effective capabilities: built-in hints < adapter hints < provider config < agent config. */
+    capabilities(id, model, override) {
+        const config = this.configs.get(id);
+        if (!config)
+            throw new ConfigurationError(`Unknown provider "${id}".`);
+        return resolveCapabilities(config.kind, model, this.get(id).capabilities?.(model), config.capabilities, override);
+    }
+    /** Whether streaming is enabled for this provider (plugins stream only if they declare it). */
+    streams(id) {
+        const config = this.configs.get(id);
+        return config?.stream !== false;
     }
     entries() {
         return [...this.adapters.entries()];
